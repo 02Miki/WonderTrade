@@ -1,6 +1,6 @@
-package com.mcsimonflash.sponge.wondertrade.command;
+package com.mcsimonflash.wondertrade.sponge.command;
 
-import com.mcsimonflash.sponge.wondertrade.WonderTrade;
+import com.mcsimonflash.wondertrade.sponge.WonderTrade;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.entity.living.player.Player;

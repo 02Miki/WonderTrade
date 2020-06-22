@@ -21,22 +21,32 @@ plugins {
 
 apply plugin: 'net.minecraftforge.gradle.forge'
 
-group 'com.mcsimonflash.sponge.wondertrade'
-version '1.0.2'
-ext.spongeversion = '7.1.0-SNAPSHOT'
-ext.teslaversion = '1.1.4'
-ext.pixelmonversion = '6.3.2'
+group 'com.mcsimonflash.wondertrade.sponge'
+version '2.1.0'
+ext.spongeversion = '7.2.0-SNAPSHOT'
+ext.teslaversion = '1.1.6'
 
 repositories {
     maven {
         url 'https://jitpack.io'
     }
+    ivy {
+        url "http://download.nodecdn.net/containers/reforged/server/release"
+        layout "pattern", {
+            artifact "[organisation]/[revision]/[artifact].[ext]"
+        }
+    }
+
 }
 
 dependencies {
     shadow "org.spongepowered:spongeapi:${spongeversion}"
     implementation "com.github.SimonFlash.TeslaPowered:TeslaLibs:v${teslaversion}"
-    shadow fileTree(dir: 'libs-', include: "Pixelmon-1.12.2-${pixelmonversion}-universal.jar")
+    deobfProvided ':Pixelmon-1.12.2-8.0.2-server:8.0.2'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "utf-8"
 }
 
 jar {
@@ -47,7 +57,7 @@ shadowJar {
     dependencies {
         include dependency("com.github.SimonFlash.TeslaPowered:TeslaLibs:v${teslaversion}")
     }
-    relocate 'com.mcsimonflash.sponge.teslalibs', 'com.mcsimonflash.sponge.wondertrade.teslalibs'
+    relocate 'com.mcsimonflash.sponge.teslalibs', 'com.mcsimonflash.wondertrade.sponge.teslalibs'
     archiveName = "${project.name}-s${spongeversion.substring(0, 3)}-v${version}.jar"
 }
 
@@ -65,9 +75,9 @@ build.dependsOn(reobfShadowJar)
 build.dependsOn(copyJars)
 
 minecraft {
-    version = "1.12.2-14.23.2.2611"
+    version = "1.12.2-14.23.5.2838"
     runDir = "run"
-    mappings = "snapshot_20171003"
+    mappings = "stable_39"
     useDepAts = true
 }
 

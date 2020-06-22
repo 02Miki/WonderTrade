@@ -1,12 +1,12 @@
-package com.mcsimonflash.sponge.wondertrade.command;
+package com.mcsimonflash.wondertrade.sponge.command;
 
+import com.mcsimonflash.wondertrade.sponge.WonderTrade;
 import com.google.inject.Inject;
 import com.mcsimonflash.sponge.teslalibs.command.Aliases;
 import com.mcsimonflash.sponge.teslalibs.command.Children;
 import com.mcsimonflash.sponge.teslalibs.command.Command;
 import com.mcsimonflash.sponge.teslalibs.command.Permission;
-import com.mcsimonflash.sponge.wondertrade.WonderTrade;
-import com.mcsimonflash.sponge.wondertrade.internal.Utils;
+import com.mcsimonflash.wondertrade.sponge.internal.Utils;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.CommandContext;
@@ -22,11 +22,11 @@ import java.util.stream.Stream;
 @Children({Menu.class, Pool.class, Regen.class, Take.class, Trade.class})
 public class Base extends Command {
 
-    private static final Text LINKS = Text.of("                       ", CmdUtils.link("Ore Project", Utils.parseURL("https://ore.spongepowerd.org/Simon_Flash/WonderTrade")), TextColors.GRAY, " | ", CmdUtils.link("Support Discord", Utils.parseURL("https://discord.gg/4wayq37")));
+    private static final Text LINKS = Text.of("                                      ", CmdUtils.link("View Plugin Wiki", Utils.parseURL("https://github.com/FriendlyRainbowAnimal/WonderTrade/wiki")));
 
     @Inject
     protected Base(Settings settings) {
-        super(settings.usage(CmdUtils.usage("/wondertrade", "The base command for WonderTrade")));
+        super(settings.usage(CmdUtils.usage("/wondertrade", "The base command for WonderTrade.")));
     }
 
     @Override

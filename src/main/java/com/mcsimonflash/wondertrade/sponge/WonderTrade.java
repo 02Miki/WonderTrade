@@ -1,28 +1,35 @@
-package com.mcsimonflash.sponge.wondertrade;
+package com.mcsimonflash.wondertrade.sponge;
 
+import com.mcsimonflash.wondertrade.sponge.command.Trade;
+import com.mcsimonflash.wondertrade.sponge.internal.LevelRangeContainer;
 import com.google.inject.Inject;
 import com.mcsimonflash.sponge.teslalibs.message.Message;
-import com.mcsimonflash.sponge.wondertrade.command.Base;
+import com.mcsimonflash.wondertrade.sponge.command.Base;
 import com.mcsimonflash.sponge.teslalibs.command.CommandService;
 import com.mcsimonflash.sponge.teslalibs.message.MessageService;
-import com.mcsimonflash.sponge.wondertrade.command.Menu;
-import com.mcsimonflash.sponge.wondertrade.internal.Utils;
+import com.mcsimonflash.wondertrade.sponge.command.Menu;
+import com.mcsimonflash.wondertrade.sponge.internal.Config;
+import com.mcsimonflash.wondertrade.sponge.internal.TradeConfig;
+import com.mcsimonflash.wondertrade.sponge.internal.Utils;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.GameReloadEvent;
 import org.spongepowered.api.event.game.state.GameStartingServerEvent;
+import org.spongepowered.api.event.game.state.GameStoppingEvent;
+import org.spongepowered.api.event.game.state.GameStoppingServerEvent;
 import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
+import org.spongepowered.api.text.serializer.TextSerializers;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 
-@Plugin(id = "wondertrade", name = "WonderTrade", version = "1.0.2", dependencies = @Dependency(id = "pixelmon"), authors = "Simon_Flash")
+@Plugin(id = "wondertrades", name = "WonderTradeSponge", version = "2.1.0", dependencies = @Dependency(id = "pixelmon"), authors = "BlakeAnderson/SimonFlash, LoneWolffy, RainbowChild", description = "Trade your pokemon for a random replacement!")
 public class WonderTrade {
 
     private static WonderTrade instance;
@@ -31,8 +38,7 @@ public class WonderTrade {
     private static CommandService commands;
     private static Path directory;
     private static MessageService messages;
-    private static Text prefix;
-
+    
     @Inject
     public WonderTrade(PluginContainer c) {
         instance = this;
@@ -48,7 +54,6 @@ public class WonderTrade {
             logger.error("An error occurred initializing message translations. Using internal copies.");
             messages = MessageService.of(container, "messages");
         }
-        prefix = Utils.toText("&3Wonder&9Trade&8: &7");
     }
 
     @Listener
@@ -56,6 +61,11 @@ public class WonderTrade {
         commands.register(Base.class);
         Sponge.getCommandManager().register(container, commands.getInstance(Menu.class).getSpec(), "wt");
         Utils.initialize();
+    }
+
+    @Listener
+    public void onShutdown(GameStoppingServerEvent event) {
+        TradeConfig.saveConfig();
     }
 
     @Listener
@@ -77,7 +87,7 @@ public class WonderTrade {
         return directory;
     }
     public static Text getPrefix() {
-        return prefix;
+    	return TextSerializers.FORMATTING_CODE.deserialize(Config.prefix);
     }
 
     public static Message getMessage(Locale locale, String key, Object... args) {
@@ -85,7 +95,7 @@ public class WonderTrade {
     }
 
     public static Text getMessage(CommandSource src, String key, Object... args) {
-        return prefix.concat(getMessage(src.getLocale(), key, args).toText());
+        return getPrefix().concat(getMessage(src.getLocale(), key, args).toText());
     }
 
 }

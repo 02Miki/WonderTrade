@@ -1,10 +1,10 @@
-package com.mcsimonflash.sponge.wondertrade.command;
+package com.mcsimonflash.wondertrade.sponge.command;
 
 import com.google.inject.Inject;
 import com.mcsimonflash.sponge.teslalibs.command.Aliases;
 import com.mcsimonflash.sponge.teslalibs.command.Command;
 import com.mcsimonflash.sponge.teslalibs.command.Permission;
-import com.mcsimonflash.sponge.wondertrade.internal.Inventory;
+import com.mcsimonflash.wondertrade.sponge.internal.Inventory;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.CommandSource;
