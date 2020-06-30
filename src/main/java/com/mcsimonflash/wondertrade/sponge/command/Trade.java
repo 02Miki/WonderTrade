@@ -37,8 +37,6 @@ public class Trade extends Command {
             long time = Utils.getCooldown(player) - (System.currentTimeMillis() - Config.getCooldown(player.getUniqueId()));
             if (time > 0) {
                 throw new CommandException(WonderTrade.getMessage(src, "wondertrade.trade.cooldown", "time", time / 1000));
-            } else if (!Config.resetCooldown(player.getUniqueId())) {
-                throw new CommandException(WonderTrade.getMessage(src, "wondertrade.trade.reset-cooldown.failure"));
             }
         }
         try {

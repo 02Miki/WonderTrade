@@ -8,6 +8,7 @@ import com.mcsimonflash.sponge.teslalibs.inventory.Layout;
 import com.mcsimonflash.sponge.teslalibs.inventory.Page;
 import com.mcsimonflash.sponge.teslalibs.inventory.View;
 import com.mcsimonflash.wondertrade.sponge.data.TradeEntry;
+import com.pixelmonmod.pixelmon.Pixelmon;
 import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.storage.PCStorage;
 import com.pixelmonmod.pixelmon.api.storage.PartyStorage;
@@ -135,18 +136,6 @@ public class Inventory {
                 return Element.of(item);
             }
             return Element.of(createPokemonItem(Config.primaryColor + name, pokemon), action);
-
-//            if (Config.allowEggs || !pokemon.isEgg()) {
-//                //If isn't egg, successful regardless of config
-//                //If is egg, requires config to allow else fails
-//                return Element.of(createPokemonItem("&3" + name, poke), action);
-//
-//
-//            } else {
-//                ItemStack item = createPokemonItem("&3" + name, poke);
-//                item.offer(Keys.ITEM_LORE, Lists.newArrayList(WonderTrade.getMessage(player.getLocale(), "wondertrade.trade.no-eggs").toText()));
-//                return Element.of(item);
-//            }
         } else {
             return Element.of(createItem(ItemTypes.BARRIER, "&4Empty!", "&cNo Pokemon Found In " + name));
         }
@@ -182,12 +171,8 @@ public class Inventory {
         if (Config.defCooldown > 0 && !player.hasPermission("wondertrade.trade.cooldownbypass")) {
             long time = Utils.getCooldown(player) - (System.currentTimeMillis() - Config.getCooldown(player.getUniqueId()));
             Consumer<Action.Click> act = inTask(a -> {
-                if (Config.resetCooldown(player.getUniqueId())) {
-                    action.accept(a);
-                    player.closeInventory();
-                } else {
-                    player.sendMessage(WonderTrade.getMessage(player, "wondertrade.trade.reset-cooldown.failure"));
-                }
+                action.accept(a);
+                player.closeInventory();
             });
             if (time > 0) {
                 confirm = Element.of(createItem(Sponge.getRegistry().getType(ItemType.class, "pixelmon:hourglass_silver").get(), "&cCooldown", "&4You must wait " + (time / 1000) + " seconds."));
@@ -257,6 +242,10 @@ public class Inventory {
     private static String getSpriteName(Pokemon pokemon) {
         if (pokemon.isEgg()) {
             return "pixelmon:" + getEggSpritePathForNBT(pokemon.getSpecies(), pokemon.getEggCycles());
+        }
+        //Temp Until Versions Above 8.0.2 with CustomTexture fix.
+        else if(pokemon.getCustomTexture() != null && Pixelmon.VERSION.equals("8.0.2")){
+            return "pixelmon:" + GuiResources.getSpritePath(pokemon.getSpecies(), pokemon.getForm(), pokemon.getGender(), pokemon.getCustomTexture(), pokemon.isShiny()).replace("/custom-" + pokemon.getCustomTexture() + "/", "/pokemon/");
         } else {
             return "pixelmon:" + GuiResources.getSpritePath(pokemon.getSpecies(), pokemon.getForm(), pokemon.getGender(), pokemon.getCustomTexture(), pokemon.isShiny());
         }

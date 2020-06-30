@@ -17,20 +17,53 @@ public class Manager {
     static TradeEntry[] trades;
     private static final Random RANDOM = new Random();
 
-    public static TradeEntry trade(TradeEntry entry) {
+
+    public static TradeEntry getTrade(TradeEntry entry) {
         //initial random check to check if it's a legendary
         //(equal legend chance regardless of selection logic later on)
         int index = RANDOM.nextInt(trades.length);
         TradeEntry tradeEntry = trades[index];
-
-
         if(!tradeEntry.getPokemon().isLegendary()){
             //If not a legendary, perform additional logic checks
             if(Config.useLevelRange){
                 LevelRangeContainer levelRangeContainer = LevelRangeContainer.getRandomWeightedLevelRange();
 
-                int low = entry.getPokemon().getLevel() - levelRangeContainer.levelRange;
-                int high = entry.getPokemon().getLevel() + levelRangeContainer.levelRange;
+                int low = entry.getPokemon().getLevel() - levelRangeContainer.range;
+                int high = entry.getPokemon().getLevel() + levelRangeContainer.range;
+
+                List<TradeEntry> filteredTrades = filterTrades(low, high, false);
+                //we filter legendarys out as we check your chance to get one earlier,
+                //with level based logic, you could exploit the system by only using pokemon within a legendary's level range
+
+                index = RANDOM.nextInt(filteredTrades.size());
+
+                return filteredTrades.get(index);
+            }
+        }
+        return tradeEntry;
+    }
+
+    public static void performTradeForEntrys(TradeEntry inputEntry, TradeEntry outputEntry) {
+        //If incoming pokemon doesn't have the undexable tag, but the config is set to mark new trades as undexable... add it!
+        if(Config.undexablePlayerTrades && !inputEntry.getPokemon().hasSpecFlag("undexable")){
+            inputEntry.getPokemon().addSpecFlag("undexable");
+        }
+        int originalIndex = Arrays.asList(trades).indexOf(outputEntry);
+        trades[originalIndex] = inputEntry;
+    }
+
+    public static TradeEntry trade(TradeEntry entry) {
+        //initial random check to check if it's a legendary
+        //(equal legend chance regardless of selection logic later on)
+        int index = RANDOM.nextInt(trades.length);
+        TradeEntry tradeEntry = trades[index];
+        if(!tradeEntry.getPokemon().isLegendary()){
+            //If not a legendary, perform additional logic checks
+            if(Config.useLevelRange){
+                LevelRangeContainer levelRangeContainer = LevelRangeContainer.getRandomWeightedLevelRange();
+
+                int low = entry.getPokemon().getLevel() - levelRangeContainer.range;
+                int high = entry.getPokemon().getLevel() + levelRangeContainer.range;
 
                 List<TradeEntry> filteredTrades = filterTrades(low, high, false);
                 //we filter legendarys out as we check your chance to get one earlier,

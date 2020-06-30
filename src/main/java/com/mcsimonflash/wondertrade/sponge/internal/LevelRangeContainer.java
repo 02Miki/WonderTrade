@@ -11,11 +11,11 @@ public class LevelRangeContainer {
     public static int totalChance = 0;
 
     public int chance;
-    public int levelRange;
+    public int range;
 
     public LevelRangeContainer(ConfigurationNode node) {
         chance = node.getNode("chance").getInt();
-        levelRange = node.getNode("range").getInt();
+        range = node.getNode("range").getInt();
         totalChance += chance;
     }
 

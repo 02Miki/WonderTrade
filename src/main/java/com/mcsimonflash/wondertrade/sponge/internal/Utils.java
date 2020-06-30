@@ -1,7 +1,10 @@
 package com.mcsimonflash.wondertrade.sponge.internal;
 
 import com.mcsimonflash.wondertrade.sponge.WonderTrade;
+import com.mcsimonflash.wondertrade.sponge.data.BroadcastTypes;
 import com.mcsimonflash.wondertrade.sponge.data.TradeEntry;
+import com.mcsimonflash.wondertrade.sponge.data.WonderTradeCooldownEvent;
+import com.mcsimonflash.wondertrade.sponge.data.WonderTradeEvent;
 import com.pixelmonmod.pixelmon.Pixelmon;
 import com.pixelmonmod.pixelmon.api.enums.DeleteType;
 import com.pixelmonmod.pixelmon.api.enums.ReceiveType;
@@ -18,6 +21,7 @@ import com.pixelmonmod.pixelmon.enums.EnumNature;
 import com.pixelmonmod.pixelmon.enums.EnumSpecies;
 import com.pixelmonmod.pixelmon.enums.EnumType;
 import com.pixelmonmod.pixelmon.enums.forms.EnumSpecial;
+import com.pixelmonmod.pixelmon.enums.forms.RegionalForms;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
 import org.spongepowered.api.Sponge;
@@ -25,6 +29,9 @@ import org.spongepowered.api.data.type.DyeColor;
 import org.spongepowered.api.data.type.DyeColors;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.entity.living.player.User;
+import org.spongepowered.api.event.cause.Cause;
+import org.spongepowered.api.event.cause.EventContext;
+import org.spongepowered.api.event.cause.EventContextKeys;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.action.TextActions;
@@ -35,15 +42,11 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 
 public class Utils {
@@ -51,9 +54,11 @@ public class Utils {
     private static World world;
     private static Task announcementTask;
     private static Task configSaveTask;
+    public static HashMap<UUID, Task> playerCooldownTasks = new HashMap<>();
     public static final UUID ZERO_UUID = new UUID(0, 0);
 
-    public static final Pattern MESSAGE = Pattern.compile("\\[(.+?)]\\{((?:.|\\n)+?)}(?=.)");
+    //public static final Pattern MESSAGE = Pattern.compile("\\[(.+?)]\\{((?:.|\\n)+?)}(?=.)");
+    public static final Pattern MESSAGE = Pattern.compile("\\[(.+?)]\\{((?:.|\\n)+?)}");
     //public static final Pattern MESSAGE = Pattern.compile("\\[(.+?)]\\(((?:.|\n)+?)\\)");
 
     public static void initialize() {
@@ -126,12 +131,12 @@ public class Utils {
             }
             builder.append(subtext.build());
             index = matcher.end();
-            if (matcher.hitEnd() && index < message.length()) {
-                builder.append(toText(message.substring(index)));
-            }
         }
         if (index == 0) {
             builder.append(toText(message));
+        }
+        else{
+            builder.append(toText(message.substring(index)));
         }
         return builder.build();
     }
@@ -168,10 +173,25 @@ public class Utils {
         }
         else{
             TradeEntry entry = trade(player, pokemon);
-            storage.set(slot,null);
-            Pixelmon.EVENT_BUS.post(new PixelmonDeletedEvent((EntityPlayerMP) player, pokemon, DeleteType.COMMAND));
-            storage.set(slot, entry.getPokemon());
-            Pixelmon.EVENT_BUS.post(new PixelmonReceivedEvent((EntityPlayerMP) player, ReceiveType.Command, entry.getPokemon()));
+            // if returns null, likely that the event was cancelled, otherwise could be a bug
+            if(entry != null){
+                //handle cooldown after successful trade, ensuring the player's cooldown only functions if their event goes through
+                if(!player.hasPermission("wondertrade.trade.cooldownbypass")){
+                    if (Config.resetCooldown(player.getUniqueId())) {
+                        long time = Utils.getCooldown(player) - (System.currentTimeMillis() - Config.getCooldown(player.getUniqueId()));
+                        Task cooldownTask = Utils.createCooldownTaskForPlayer(player, time);
+                        Utils.playerCooldownTasks.put(player.getUniqueId(), cooldownTask);
+                    }
+                    else{
+                        player.sendMessage(WonderTrade.getMessage(player, "wondertrade.trade.reset-cooldown.failure"));
+                    }
+                }
+
+                storage.set(slot,null);
+                Pixelmon.EVENT_BUS.post(new PixelmonDeletedEvent((EntityPlayerMP) player, pokemon, DeleteType.COMMAND));
+                storage.set(slot, entry.getPokemon());
+                Pixelmon.EVENT_BUS.post(new PixelmonReceivedEvent((EntityPlayerMP) player, ReceiveType.Command, entry.getPokemon()));
+            }
         }
     }
 
@@ -189,40 +209,71 @@ public class Utils {
         }
         else{
             TradeEntry entry = trade(player, pokemon);
-            storage.getBox(box).set(position, null);
-            Pixelmon.EVENT_BUS.post(new PixelmonDeletedEvent((EntityPlayerMP) player, pokemon, DeleteType.COMMAND));
-            storage.getBox(box).set(position, entry.getPokemon());
-            Pixelmon.EVENT_BUS.post(new PixelmonReceivedEvent((EntityPlayerMP) player, ReceiveType.Command, entry.getPokemon()));
+            // if returns null, likely that the event was cancelled, otherwise could be a bug
+            if(entry != null){
+                //handle cooldown after successful trade, ensuring the player's cooldown only functions if their event goes through
+                if(!player.hasPermission("wondertrade.trade.cooldownbypass")){
+                    if (Config.resetCooldown(player.getUniqueId())) {
+                        long time = Utils.getCooldown(player) - (System.currentTimeMillis() - Config.getCooldown(player.getUniqueId()));
+                        Task cooldownTask = Utils.createCooldownTaskForPlayer(player, time);
+                        Utils.playerCooldownTasks.put(player.getUniqueId(), cooldownTask);
+                    }
+                    else{
+                        player.sendMessage(WonderTrade.getMessage(player, "wondertrade.trade.reset-cooldown.failure"));
+                    }
+                }
+
+                storage.getBox(box).set(position, null);
+                Pixelmon.EVENT_BUS.post(new PixelmonDeletedEvent((EntityPlayerMP) player, pokemon, DeleteType.COMMAND));
+                storage.getBox(box).set(position, entry.getPokemon());
+                Pixelmon.EVENT_BUS.post(new PixelmonReceivedEvent((EntityPlayerMP) player, ReceiveType.Command, entry.getPokemon()));
+            }
         }
     }
 
     private static TradeEntry trade(Player player, Pokemon pokemon) {
-        //If incoming pokemon doesn't have the undexable tag, but the config is set to mark new trades as undexable... add it!
-        if(Config.undexablePlayerTrades && !pokemon.hasSpecFlag("undexable")){
-            pokemon.addSpecFlag("undexable");
-        }
-        TradeEntry entry = new TradeEntry(pokemon, player.getUniqueId(), LocalDateTime.now());
-        logTransaction(player, entry, true);
-        entry = Manager.trade(entry).refine(player);
-        logTransaction(player, entry, false);
-        Object[] args = new Object[] {"player", player.getName(), "traded", getShortDesc(pokemon), "traded-details", getDesc(pokemon), "received", getShortDesc(entry.getPokemon()), "received-details", getDesc(entry.getPokemon())};
-        if (Config.broadcastTrades && (announcementCheck(pokemon) || announcementCheck(entry.getPokemon()))) {
-            //Player Input Pokemon
-            if(announcementCheck(pokemon) && !announcementCheck(entry.getPokemon())){
-                Sponge.getServer().getBroadcastChannel().send(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.broadcast.input", args).toString())));
-            }
-            //Returned Pokemon
-            if(announcementCheck(entry.getPokemon()) && !announcementCheck(pokemon)){
-                Sponge.getServer().getBroadcastChannel().send(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.broadcast.received", args).toString())));
-            }
-            //Pog both were speical
-            if(announcementCheck(entry.getPokemon()) && announcementCheck(pokemon)){
-                Sponge.getServer().getBroadcastChannel().send(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.broadcast.doublespecial", args).toString())));
-            }
+        //create TradeEntry object for input pokemon
+        TradeEntry inputEntry = new TradeEntry(pokemon, player.getUniqueId(), LocalDateTime.now());
+        //get TradeEntry object for what will be the output pokemon
+        TradeEntry outputEntry = Manager.getTrade(inputEntry);
 
+        //create event
+        EventContext eventContext = EventContext.builder().add(EventContextKeys.PLUGIN, WonderTrade.getContainer()).add(EventContextKeys.PLAYER, player).build();
+        WonderTradeEvent event = new WonderTradeEvent(player, inputEntry, outputEntry, Cause.of(eventContext,  WonderTrade.getContainer()));
+        //push event
+        Sponge.getEventManager().post(event);
+
+        //if event doesn't get cancelled, we move forward
+        if (!event.isCancelled()) {
+            //log input
+            logTransaction(player, inputEntry, true);
+            //log output
+            logTransaction(player, outputEntry, false);
+            //perform change checks on output
+            outputEntry.refine(player);
+            //trade two pokemon
+            Manager.performTradeForEntrys(inputEntry, outputEntry);
+
+            Object[] args = new Object[] {"player", player.getName(), "traded", getShortDesc(pokemon), "traded-details", getDesc(pokemon), "received", getShortDesc(outputEntry.getPokemon()), "received-details", getDesc(outputEntry.getPokemon())};
+            if (Config.broadcastTrades && (broadcastCheck(pokemon) || broadcastCheck(outputEntry.getPokemon()))) {
+                //Player Input Pokemon
+                if(broadcastCheck(pokemon) && !broadcastCheck(outputEntry.getPokemon())){
+                    Sponge.getServer().getBroadcastChannel().send(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.broadcast.input", args).toString())));
+                }
+                //Returned Pokemon
+                else if(broadcastCheck(outputEntry.getPokemon()) && !broadcastCheck(pokemon)){
+                    Sponge.getServer().getBroadcastChannel().send(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.broadcast.received", args).toString())));
+                }
+                //Pog both were special
+                else if(broadcastCheck(outputEntry.getPokemon()) && broadcastCheck(pokemon)){
+                    Sponge.getServer().getBroadcastChannel().send(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.broadcast.doublespecial", args).toString())));
+                }
+
+            }
+            player.sendMessage(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.message", args).toString())));
+            return outputEntry;
         }
-        player.sendMessage(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.trade.success.message", args).toString())));
-        return entry;
+        return null;
     }
 
     public static void take(Player player, int index) {
@@ -235,11 +286,36 @@ public class Utils {
 
     public static void logTransaction(User user, TradeEntry entry, boolean add) {
         WonderTrade.getLogger().info(user.getName() + (add ? " added " : " removed ") + "a " + getShortDesc(entry.getPokemon()) + (add ? "." : " (added by " + entry.getOwnerName() + ")."));
-
     }
 
     public static String getShortDesc(Pokemon pokemon) {
-        return pokemon.isEgg() ? "Mysterious Egg" : "Level " + pokemon.getLevel() + (pokemon.isShiny() ? " Shiny " : " ") + (EnumSpecies.legendaries.contains(pokemon.getSpecies().name) ? "Legendary " : "") + pokemon.getSpecies().name;
+        if(pokemon.isEgg()){
+            return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.text.egg").toString();
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.text.level"))
+                .append(" ")
+                .append(pokemon.getLevel());
+        if(pokemon.isShiny()){
+            builder.append(" ").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.text.shiny"));
+        }
+        if(EnumSpecies.ultrabeasts.contains(pokemon.getSpecies().name)){
+            builder.append(" ").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.text.ultrabeast"));
+        }
+        if(EnumSpecies.legendaries.contains(pokemon.getSpecies().name)){
+            builder.append(" ").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.text.legendary"));
+        }
+        if(pokemon.getForm() >= 100){
+            builder.append(" ").append(getPokemonSpecialTexture(pokemon).getTranslatedName().getUnformattedComponentText());
+        }
+        else if(!pokemon.getCustomTexture().isEmpty() && pokemon.getCustomTexture() != null){
+            builder.append(" ").append(pokemon.getCustomTexture());
+        }
+        if(pokemon.getFormEnum() == RegionalForms.ALOLAN || pokemon.getFormEnum() == RegionalForms.GALARIAN){
+            builder.append(" ").append(pokemon.getFormEnum().getTranslatedName().getUnformattedComponentText());
+        }
+        builder.append(" ").append(pokemon.getSpecies().getTranslatedName().getUnformattedComponentText());
+        return builder.toString();
     }
 
 
@@ -253,62 +329,141 @@ public class Utils {
         double IVPercent = (100* IVTotal/186.0);
 
         if (pokemon.isEgg()) {
-            return String.format("%1$sPokemon : %2$sMysterious Egg", Config.primaryColor, Config.secondaryColor);
+            return String.format("%1$s" + WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.pokemonlabel") + " : %2$s" + WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.egg"), Config.primaryColor, Config.secondaryColor);
         }
         StringBuilder builder = new StringBuilder();
-        builder.append("%1$sPokemon : ");
+        builder.append("%1$s").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.pokemonlabel")).append(" : ");
         if (pokemon.isShiny()) {
-            builder.append("%3$sShiny ");
+            builder.append("%3$s").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.shinylabel")).append(" ");
+        }
+        if (EnumSpecies.ultrabeasts.contains(pokemon.getSpecies().name)) {
+            builder.append("%3$s").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.ultrabeastlabel")).append(" ");
         }
         if (EnumSpecies.legendaries.contains(pokemon.getSpecies().name)) {
-            builder.append("%3$sLegendary ");
+            builder.append("%3$s").append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.legendarylabel")).append(" ");
+        }
+        if (pokemon.getFormEnum() == RegionalForms.ALOLAN || pokemon.getFormEnum() == RegionalForms.GALARIAN) {
+            builder.append("%3$s").append(pokemon.getFormEnum().getTranslatedName().getUnformattedComponentText()).append(" ");
         }
         builder.append("%2$s")
-                .append(pokemon.getSpecies().name).append(" \n")
-                .append(" %1$s- Level : %2$s").append(pokemon.getLevel()).append(" \n")
-                .append(" %1$s- OriginalTrainer : %2$s").append(pokemon.getOriginalTrainer()).append(" \n")
-                .append(" %1$s- Ability : %2$s").append(pokemon.getAbility().getName());
+                .append(pokemon.getSpecies().getTranslatedName().getUnformattedComponentText()).append(" \n")
+                .append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.levellabel"))
+                .append(" : %2$s").append(pokemon.getLevel()).append(" \n")
+
+                .append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.originaltrainerlabel"))
+                .append(" : %2$s").append(pokemon.getOriginalTrainer()).append(" \n")
+
+                .append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.abilitylabel"))
+                .append(" : %2$s").append(pokemon.getAbility().getTranslatedName().getUnformattedComponentText());
+
         if(pokemon.getAbilitySlot() == 2){
-            builder.append(" %2$s(%3$sHA%2$s)");
+            builder.append(" %2$s(%3$s")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.hiddenabilitylabel"))
+                    .append("%2$s)");
         }
         builder.append(" \n");
-        builder.append(" %1$s- Nature : %2$s").append(resolvePokeNatureString(pokemon.getNature())).append("\n");
+
+        builder.append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.naturelabel"))
+                .append(" : %2$s")
+                .append(resolvePokeNatureString(pokemon.getNature())).append("\n");
         if(pokemon.getMintNature() != null){
-            builder.append(" %3$s- MintNature : %3$s").append(resolvePokeNatureString(pokemon.getMintNature())).append("\n");
+            builder.append(" %3$s- ")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.mintnaturelabel"))
+                    .append(" : %3$s")
+                    .append(resolvePokeNatureString(pokemon.getNature())).append("\n");
         }
-        builder.append(" %1$s- HiddenPower : %2$s").append(resolvePokeHiddenPowerString(pokemon)).append("\n");
-        builder.append(" %1$s- Growth : %2$s").append(pokemon.getGrowth().name()).append("\n");
-        builder.append(" %1$s- Gender : %2$s").append(resolvePokeGenderString(pokemon)).append("\n");
+
+        builder.append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.hiddenpowerlabel"))
+                .append(" : %2$s")
+                .append(resolvePokeHiddenPowerString(pokemon)).append("\n");
+
+        builder.append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.growthlabel"))
+                .append(" : %2$s")
+                .append(pokemon.getGrowth().getTranslatedName().getUnformattedComponentText()).append("\n");
+
+        builder.append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.genderlabel"))
+                .append(" : %2$s")
+                .append(resolvePokeGenderString(pokemon)).append("\n");
+
         if (pokemon.getHeldItem() != net.minecraft.item.ItemStack.EMPTY) {
-            builder.append(" %1$s- Held Item : %2$s").append(pokemon.getHeldItem().getDisplayName()).append("\n");
+            builder.append(" %1$s- ")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.helditemlabel"))
+                    .append(" : %2$s")
+                    .append(pokemon.getHeldItem().getDisplayName()).append("\n");
         }
-        builder.append(" %1$s- Poke Ball : %2$s").append(pokemon.getCaughtBall().getLocalizedName()).append("\n");
+
+        builder.append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.pokeballlabel"))
+                .append(" : %2$s")
+                .append(pokemon.getCaughtBall().getTranslatedName().getUnformattedComponentText()).append("\n");
+
         if (pokemon.getForm() >= 100) {
-            builder.append(" %3$s- Special Texture : ").append(getPokemonSpecialTexture(pokemon).name()).append("\n");
+            builder.append(" %3$s- ")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.specialtexturelabel"))
+                    .append(" : %3$s")
+                    .append(getPokemonSpecialTexture(pokemon).getTranslatedName().getUnformattedComponentText()).append("\n");
         }
         if (!pokemon.getCustomTexture().isEmpty() && pokemon.getCustomTexture() != null ){
-            builder.append(" %3$s- Custom Texture : ").append(pokemon.getCustomTexture()).append("\n");
+            builder.append(" %3$s- ")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.customtexturelabel"))
+                    .append(" : %3$s")
+                    .append(pokemon.getCustomTexture()).append("\n");
+        }
+        if (pokemon.getPersistentData().hasKey("entity-particles:particle")){
+            builder.append(" %3$s- ")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.entityparticles"))
+                    .append(" : %3$s")
+                    .append(pokemon.getPersistentData().getString("entity-particles:particle")).append("\n");
         }
 
+        builder.append(" %1$s- ")
+                .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.friendshiplabel"))
+                .append(" : %2$s")
+                .append(pokemon.getFriendship()).append("\n").append("\n");
 
-        builder.append(" %1$s- Friendship : %2$s").append(pokemon.getFriendship()).append("\n").append("\n")
                 //EVS
-                .append("%1$sEVs %1$s:   %2$s").append(EVTotal).append("%1$s/%2$s510 %1$s- %2$s").append(f.format(EVPercent)).append("%1$s%%")
-                .append("\n   %2$s")
-                .append(evs.hp).append(" HP").append(" %1$s/ %2$s")
-                .append(evs.attack).append(" Atk").append(" %1$s/ %2$s")
-                .append(evs.defence).append(" Def")
-                .append("\n   ")
-                .append(evs.specialAttack).append(" SpAtk").append(" %1$s/ %2$s")
-                .append(evs.specialDefence).append(" SpDef").append(" %1$s/ %2$s")
-                .append(evs.speed).append(" Speed")
-                .append("\n")
+                builder.append("%1$s")
+                        .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.evslabel"))
+                        .append(" %1$s:   %2$s").append(EVTotal).append("%1$s/%2$s510 %1$s- %2$s").append(f.format(EVPercent)).append("%1$s%%")
+                .append("\n   %2$s");
+
+        StatsType[] types = StatsType.getStatValues();
+        int statsLength = types.length;
+        for(int i = 0; i < statsLength; i++) {
+            StatsType type = types[i];
+
+            builder.append(evs.get(type));
+            builder.append(" %2$s").append(getShortStatName(type));
+
+            if(i == 2){
+                builder.append("\n   ");
+            }
+            else if(i != 5){
+                builder.append(" %1$s/ %2$s");
+            }
+        }
+//                .append(evs.hp).append(getShortStatName(StatsType.HP)).append(" %1$s/ %2$s")
+//                .append(evs.attack).append(" Atk").append(" %1$s/ %2$s")
+//                .append(evs.defence).append(" Def")
+//                .append("\n   ")
+//                .append(evs.specialAttack).append(" SpAtk").append(" %1$s/ %2$s")
+//                .append(evs.specialDefence).append(" SpDef").append(" %1$s/ %2$s")
+//                .append(evs.speed).append(" Speed")
+//                .append("\n")
+
                 //IVS
-                .append("\n%1$sIVs %1$s:   %2$s").append(IVTotal).append("%1$s/%2$s186 %1$s- %2$s").append(f.format(IVPercent)).append("%1$s%%");
+                builder.append("\n%1$s")
+                        .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.ivslabel"))
+                        .append(" %1$s:   %2$s").append(IVTotal).append("%1$s/%2$s186 %1$s- %2$s").append(f.format(IVPercent)).append("%1$s%%");
         if(ivs.isHyperTrained(StatsType.HP) || ivs.isHyperTrained(StatsType.Attack) || ivs.isHyperTrained(StatsType.Defence) || ivs.isHyperTrained(StatsType.SpecialAttack) || ivs.isHyperTrained(StatsType.SpecialDefence) || ivs.isHyperTrained(StatsType.Speed)){
             int hyperIVTotal = 0;
-            StatsType[] types = StatsType.getStatValues();
-            int statsLength = types.length;
 
             for(int i = 0; i < statsLength; ++i) {
                 StatsType type = types[i];
@@ -320,12 +475,12 @@ public class Utils {
                 }
             }
             double hyperIVPercent = (100* hyperIVTotal/186.0);
-            builder.append("\n%3$sHyperTrained IVs %1$s:   %3$s").append(hyperIVTotal).append("%1$s/%3$s186 %1$s- %3$s").append(f.format(hyperIVPercent)).append("%1$s%%");
+            builder.append("\n%3$s")
+                    .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.hypertrainedivslabel"))
+                    .append(" %1$s:   %3$s").append(hyperIVTotal).append("%1$s/%3$s186 %1$s- %3$s").append(f.format(hyperIVPercent)).append("%1$s%%");
         }
 
         builder.append("\n   %2$s");
-        StatsType[] types = StatsType.getStatValues();
-        int statsLength = types.length;
         for(int i = 0; i < statsLength; i++) {
             StatsType type = types[i];
 
@@ -356,21 +511,21 @@ public class Utils {
     public static String getShortStatName(StatsType type){
         switch (type){
             case HP:
-                return "HP";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.hp").toString();
             case Attack:
-                return "Atk";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.attack").toString();
             case Defence:
-                return "Def";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.defence").toString();
             case SpecialAttack:
-                return "SpAtk";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.specialattack").toString();
             case SpecialDefence:
-                return "SpDef";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.specialdefence").toString();
             case Speed:
-                return "Speed";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.speed").toString();
             case Accuracy:
-                return "Acc";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.accuracy").toString();
             case Evasion:
-                return "Eva";
+                return WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.stats.short.evasion").toString();
             case None:
                 return "None";
             default:
@@ -380,10 +535,10 @@ public class Utils {
 
     public static String resolvePokeGenderString(Pokemon pokemon){
         if(pokemon.getGender().name().equals("Male")){
-            return "&bMale ♂";
+            return "&b" + pokemon.getGender().getTranslatedName().getUnformattedComponentText() + " ♂";
         }
         if(pokemon.getGender().name().equals("Female")){
-            return "&dFemale ♀";
+            return "&d" + pokemon.getGender().getTranslatedName().getUnformattedComponentText() + " ♀";
         }
         else{
             return "&7Genderless ø";
@@ -392,10 +547,10 @@ public class Utils {
 
     public static String resolvePokeNatureString(EnumNature nature){
         if(nature == EnumNature.Hardy || nature == EnumNature.Serious || nature == EnumNature.Docile || nature == EnumNature.Bashful || nature == EnumNature.Quirky){
-            return nature.getLocalizedName() + " &7(Neutral)";
+            return nature.getTranslatedName().getUnformattedComponentText() + " &7(" + WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.utils.nature.boost.neutral").toString() + ")";
         }
         else{
-            return nature.getLocalizedName() + " &7(&a+ " + nature.increasedStat.getLocalizedName() + " &7/ &c- " + nature.decreasedStat.getLocalizedName() + "&7)";
+            return nature.getTranslatedName().getUnformattedComponentText() + " &7(&a+ " + nature.increasedStat.getTranslatedName().getUnformattedComponentText() + " &7/ &c- " + nature.decreasedStat.getTranslatedName().getUnformattedComponentText() + "&7)";
         }
     }
 
@@ -492,7 +647,30 @@ public class Utils {
         return EnumSpecial.Base;
     }
 
-    private static boolean announcementCheck(Pokemon pokemon){
-        return pokemon.isShiny() || EnumSpecies.ultrabeasts.contains(pokemon.getSpecies().name) || pokemon.isLegendary();
+    private static boolean broadcastCheck(Pokemon pokemon){
+        return pokemon.isShiny() && Config.broadcastTypes.contains(BroadcastTypes.SHINY) ||
+                EnumSpecies.ultrabeasts.contains(pokemon.getSpecies().name) && Config.broadcastTypes.contains(BroadcastTypes.ULTRABEAST) ||
+                pokemon.isLegendary() && Config.broadcastTypes.contains(BroadcastTypes.LEGENDARY) ||
+                pokemon.getForm() >= 100 && Config.broadcastTypes.contains(BroadcastTypes.SPECIALTEXTURE) ||
+                !pokemon.getCustomTexture().isEmpty() && Config.broadcastTypes.contains(BroadcastTypes.CUSTOMTEXTURE) ||
+                pokemon.getPersistentData().hasKey("entity-particles:particle") && Config.broadcastTypes.contains(BroadcastTypes.AURA)
+                ;
+    }
+
+    public static Task createCooldownTaskForPlayer(Player player, long time){
+        return Task.builder()
+                .execute(t -> {
+                    playerCooldownTasks.remove(player.getUniqueId());
+                    //create event
+                    EventContext eventContext = EventContext.builder().add(EventContextKeys.PLUGIN, WonderTrade.getContainer()).add(EventContextKeys.PLAYER, player).build();
+                    WonderTradeCooldownEvent event = new WonderTradeCooldownEvent(player, Cause.of(eventContext,  WonderTrade.getContainer()));
+                    //push event
+                    Sponge.getEventManager().post(event);
+                    if(player.isOnline() && Config.notifyCooldowns){
+                        player.sendMessage(WonderTrade.getMessage(player, "wondertrade.trade.cooldown.expired"));
+                    }
+                })
+                .delay(time, TimeUnit.MILLISECONDS)
+                .submit(WonderTrade.getContainer());
     }
 }

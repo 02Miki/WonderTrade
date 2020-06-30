@@ -1,23 +1,18 @@
 package com.mcsimonflash.wondertrade.sponge;
 
-import com.mcsimonflash.wondertrade.sponge.command.Trade;
-import com.mcsimonflash.wondertrade.sponge.internal.LevelRangeContainer;
+import com.mcsimonflash.wondertrade.sponge.internal.*;
 import com.google.inject.Inject;
 import com.mcsimonflash.sponge.teslalibs.message.Message;
 import com.mcsimonflash.wondertrade.sponge.command.Base;
 import com.mcsimonflash.sponge.teslalibs.command.CommandService;
 import com.mcsimonflash.sponge.teslalibs.message.MessageService;
 import com.mcsimonflash.wondertrade.sponge.command.Menu;
-import com.mcsimonflash.wondertrade.sponge.internal.Config;
-import com.mcsimonflash.wondertrade.sponge.internal.TradeConfig;
-import com.mcsimonflash.wondertrade.sponge.internal.Utils;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.GameReloadEvent;
 import org.spongepowered.api.event.game.state.GameStartingServerEvent;
-import org.spongepowered.api.event.game.state.GameStoppingEvent;
 import org.spongepowered.api.event.game.state.GameStoppingServerEvent;
 import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
@@ -29,7 +24,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 
-@Plugin(id = "wondertrades", name = "WonderTradeSponge", version = "2.1.0", dependencies = @Dependency(id = "pixelmon"), authors = "BlakeAnderson/SimonFlash, LoneWolffy, RainbowChild", description = "Trade your pokemon for a random replacement!")
+@Plugin(id = "wondertrades", name = "WonderTradeSponge", version = "2.2.0", dependencies = @Dependency(id = "pixelmon"), authors = "BlakeAnderson/SimonFlash, LoneWolffy, RainbowChild", description = "Trade your pokemon for a random replacement!")
 public class WonderTrade {
 
     private static WonderTrade instance;
@@ -60,6 +55,7 @@ public class WonderTrade {
     public void onStart(GameStartingServerEvent event) {
         commands.register(Base.class);
         Sponge.getCommandManager().register(container, commands.getInstance(Menu.class).getSpec(), "wt");
+        Sponge.getEventManager().registerListeners(this, new CooldownCheckJoinListener());
         Utils.initialize();
     }
 
