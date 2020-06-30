@@ -22,7 +22,7 @@ plugins {
 apply plugin: 'net.minecraftforge.gradle.forge'
 
 group 'com.mcsimonflash.wondertrade.sponge'
-version '2.2.0'
+version '2.2.1'
 ext.spongeversion = '7.2.0-SNAPSHOT'
 ext.teslaversion = '1.1.6'
 

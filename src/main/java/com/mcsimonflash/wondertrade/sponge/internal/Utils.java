@@ -162,6 +162,8 @@ public class Utils {
     public static void trade(Player player, int slot) {
         PartyStorage storage = getPartyStorage(player);
         Pokemon pokemon = storage.get(slot);
+        //to stop ghost entities
+        storage.retrieveAll();
 
         if (pokemon.isEgg() && !(Config.allowEggs || player.hasPermission("wondertrade.trade.eggbypass")) ){
             player.sendMessage(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(player.getLocale(), "wondertrade.trade.no-eggs").toString())));
@@ -198,6 +200,8 @@ public class Utils {
     public static void trade(Player player, int box, int position) {
         PCStorage storage = getPCStorage(player);
         Pokemon pokemon = storage.getBox(box).get(position);
+        //to stop ghost entities
+        getPartyStorage(player).retrieveAll();
 
         if (pokemon.isEgg() && !(Config.allowEggs || player.hasPermission("wondertrade.trade.eggbypass")) ){
             player.sendMessage(WonderTrade.getPrefix().concat(parseText(WonderTrade.getMessage(player.getLocale(), "wondertrade.trade.no-eggs").toString())));
@@ -309,7 +313,10 @@ public class Utils {
             builder.append(" ").append(getPokemonSpecialTexture(pokemon).getTranslatedName().getUnformattedComponentText());
         }
         else if(!pokemon.getCustomTexture().isEmpty() && pokemon.getCustomTexture() != null){
-            builder.append(" ").append(pokemon.getCustomTexture());
+            builder.append(" ").append(capitalizeFirstLetter(pokemon.getCustomTexture()));
+        }
+        if(pokemon.getPersistentData().hasKey("entity-particles:particle")){
+            builder.append(" ").append(capitalizeFirstLetter(pokemon.getPersistentData().getString("entity-particles:particle")));
         }
         if(pokemon.getFormEnum() == RegionalForms.ALOLAN || pokemon.getFormEnum() == RegionalForms.GALARIAN){
             builder.append(" ").append(pokemon.getFormEnum().getTranslatedName().getUnformattedComponentText());
@@ -414,13 +421,13 @@ public class Utils {
             builder.append(" %3$s- ")
                     .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.customtexturelabel"))
                     .append(" : %3$s")
-                    .append(pokemon.getCustomTexture()).append("\n");
+                    .append(capitalizeFirstLetter(pokemon.getCustomTexture())).append("\n");
         }
         if (pokemon.getPersistentData().hasKey("entity-particles:particle")){
             builder.append(" %3$s- ")
                     .append(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.ui.pokesprite.lore.entityparticles"))
                     .append(" : %3$s")
-                    .append(pokemon.getPersistentData().getString("entity-particles:particle")).append("\n");
+                    .append(capitalizeFirstLetter(pokemon.getPersistentData().getString("entity-particles:particle"))).append("\n");
         }
 
         builder.append(" %1$s- ")
@@ -672,5 +679,9 @@ public class Utils {
                 })
                 .delay(time, TimeUnit.MILLISECONDS)
                 .submit(WonderTrade.getContainer());
+    }
+
+    public static String capitalizeFirstLetter(String string){
+        return string.substring(0,1).toUpperCase() + string.substring(1);
     }
 }
