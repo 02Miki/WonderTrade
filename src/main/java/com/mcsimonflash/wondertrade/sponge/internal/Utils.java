@@ -74,8 +74,11 @@ public class Utils {
         if (Config.announceInt > 0) {
             announcementTask = Task.builder()
                     .execute(t -> {
-                        int shinies = 0, ultrabeasts = 0, legendaries = 0;
+                        int eggs = 0, shinies = 0, ultrabeasts = 0, legendaries = 0;
                         for (TradeEntry entry : Manager.trades) {
+                            if (entry.getPokemon().isEgg()) {
+                                eggs++;
+                            }
                             if (entry.getPokemon().isShiny()) {
                                 shinies++;
                             }
@@ -87,7 +90,7 @@ public class Utils {
                             }
                         }
                         //Intentionally don't add prefix to this message to offer servers full configurability of their message. (Hope to see multi-line usage!)
-                        Sponge.getServer().getBroadcastChannel().send(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.announcement", "pool-size", Config.poolSize, "shinies", shinies, "ultrabeasts", ultrabeasts, "legendaries", legendaries).toText());
+                        Sponge.getServer().getBroadcastChannel().send(WonderTrade.getMessage(Locales.DEFAULT, "wondertrade.announcement", "pool-size", Config.poolSize, "eggs", eggs, "shinies", shinies, "ultrabeasts", ultrabeasts, "legendaries", legendaries).toText());
                     })
                     .interval(Config.announceInt, TimeUnit.MILLISECONDS)
                     .submit(WonderTrade.getContainer());

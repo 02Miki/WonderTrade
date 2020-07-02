@@ -86,7 +86,7 @@ public class Config {
             TradeConfig.configFile = WonderTrade.getDirectory().resolve("storage").resolve("trades.pool").toFile();
             if(!TradeConfig.configFile.exists()){
                 Manager.fillPool(startup && regenOnRestart, regenOverwritePlayers);
-                TradeConfig.loadConfig();
+                TradeConfig.saveConfig();
             }
             else{
                 TradeConfig.loadConfig();

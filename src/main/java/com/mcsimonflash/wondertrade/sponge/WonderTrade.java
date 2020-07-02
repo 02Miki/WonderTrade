@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 
-@Plugin(id = "wondertrades", name = "WonderTradeSponge", version = "2.2.1", dependencies = @Dependency(id = "pixelmon"), authors = "BlakeAnderson/SimonFlash, LoneWolffy, RainbowChild", description = "Trade your pokemon for a random replacement!")
+@Plugin(id = "wondertrades", name = "WonderTradeSponge", version = "2.2.2", dependencies = @Dependency(id = "pixelmon"), authors = "BlakeAnderson/SimonFlash, LoneWolffy, RainbowChild", description = "Trade your pokemon for a random replacement!")
 public class WonderTrade {
 
     private static WonderTrade instance;
@@ -66,6 +66,7 @@ public class WonderTrade {
 
     @Listener
     public void onReload(GameReloadEvent event) {
+        TradeConfig.saveConfig();
         messages.reload();
         Utils.initialize();
     }
